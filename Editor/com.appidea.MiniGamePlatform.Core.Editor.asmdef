@@ -1,0 +1,20 @@
+{
+    "name": "com.appidea.MiniGamePlatform.Core.Editor",
+    "rootNamespace": "com.appidea.MiniGamePlatform.Core.Editor",
+    "references": [
+        "com.appidea.MiniGamePlatform.CommunicationAPI",
+        "Unity.Addressables",
+        "com.appidea.MiniGamePlatform.CommunicationAPI.Editor",
+        "Unity.Addressables.Editor",
+        "com.appidea.MiniGamePlatform.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
