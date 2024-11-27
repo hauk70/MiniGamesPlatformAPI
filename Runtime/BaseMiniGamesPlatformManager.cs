@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,35 +14,40 @@ using UnityEngine.SceneManagement;
 namespace com.appidea.MiniGamePlatform.Core
 {
     /*
-     * read only built in property (for now)
+     * TODO 
+     * subscribe to unity`s log message event to detect exceptions from mini games (current mini game) to force stop it
+     * simple preloader
      * build in load
      */
-    public sealed class BaseMiniGamesPlatformManager : IMiniGamesPlatformManager
+
+    public class BaseMiniGamesPlatformManager : IMiniGamesPlatformManager
     {
         public IReadOnlyList<string> MiniGameNames =>
-            _config.MiniGameConfigs.Select(mg => mg.Config.MiniGameName).ToList();
+            Config.MiniGameConfigs.Select(mg => mg.Config.MiniGameName).ToList();
 
-        public bool IsMiniGameRunning => _miniGameState?.RunningTask != null;
-        public string CurrentMiniGameName => _miniGameState?.Name;
-        public IMiniGameLoadingProgressHandler MiniGameLoadingProgressHandler => _loadingProgressHandler;
+        public bool IsMiniGameRunning => MiniGameState?.RunningTask != null;
+        public string CurrentMiniGameName => MiniGameState?.Name;
+        public IMiniGameLoadingProgressHandler MiniGameLoadingProgressHandler => LoadingProgressHandler;
 
-        private readonly MiniGamesPlatformConfig _config;
-        private readonly ISaveProvider _saveProvider;
-        private readonly IAnalyticsLogger _analyticsLogger;
-        private readonly ILogger _logger;
+        protected readonly MiniGamesPlatformConfig Config;
+        protected readonly ISaveProvider SaveProvider;
+        protected readonly IAnalyticsLogger AnalyticsLogger;
+        protected readonly ILogger Logger;
+        protected readonly ILogger MiniGameLogger;
 
-        private readonly MiniGameProxyLoadingProgressHandler _loadingProgressHandler =
+        protected readonly MiniGameProxyLoadingProgressHandler LoadingProgressHandler =
             new MiniGameProxyLoadingProgressHandler();
 
-        private RunningMiniGameState _miniGameState;
+        protected RunningMiniGameState MiniGameState;
 
         public BaseMiniGamesPlatformManager(MiniGamesPlatformConfig config, ISaveProvider saveProvider,
             IAnalyticsLogger analyticsLogger, ILogger logger)
         {
-            _config = config;
-            _saveProvider = saveProvider;
-            _analyticsLogger = analyticsLogger;
-            _logger = logger;
+            Config = config;
+            SaveProvider = new MiniGameSaveProvider(saveProvider, DecorateSaveProviderKey);
+            AnalyticsLogger = new MiniGameAnalyticsLogger(analyticsLogger, DecorateAnalyticsKey);
+            Logger = logger;
+            MiniGameLogger = new MiniGameLogger(logger, DecorateLogger);
         }
 
         public async Task<bool> IsMiniGameCacheReady(string miniGameName)
@@ -87,7 +91,8 @@ namespace com.appidea.MiniGamePlatform.Core
             if (keysToDownload.Count <= 0)
                 return true;
 
-            var downloadHandle = Addressables.DownloadDependenciesAsync((IEnumerable)keysToDownload, Addressables.MergeMode.Union);
+            var downloadHandle =
+                Addressables.DownloadDependenciesAsync((IEnumerable)keysToDownload, Addressables.MergeMode.Union);
             await downloadHandle.Task;
 
             if (downloadHandle.Status != AsyncOperationStatus.Succeeded)
@@ -99,7 +104,7 @@ namespace com.appidea.MiniGamePlatform.Core
 
         public async Task LoadAndRunMiniGame(string miniGameName, CancellationToken cancellationToken)
         {
-            if (_miniGameState != null)
+            if (MiniGameState != null)
                 throw new InvalidOperationException("Another mini-game is already running.");
 
             EnsureMiniGameNameIsValid(miniGameName);
@@ -111,7 +116,7 @@ namespace com.appidea.MiniGamePlatform.Core
                 if (await IsMiniGameCacheReady(miniGameName) == false)
                     if (await PreloadGame(miniGameName) == false)
                     {
-                        _logger.LogError(LogType.Exception.ToString(), $"Failed to preload mini-game: {miniGameName}");
+                        Logger.LogError(LogType.Exception.ToString(), $"Failed to preload mini-game: {miniGameName}");
                         return;
                     }
 
@@ -120,25 +125,25 @@ namespace com.appidea.MiniGamePlatform.Core
                 var catalog = await LoadCatalog(miniGameName);
                 var entryPoint = await CreateEntryPoint(catalog, miniGameScene);
 
-                _miniGameState = new RunningMiniGameState(miniGameName, miniGameScene, prevScene, entryPoint,
+                MiniGameState = new RunningMiniGameState(miniGameName, miniGameScene, prevScene, entryPoint,
                     runningTaskSource);
 
-                _loadingProgressHandler.SetHandler(_miniGameState.EntryPoint.LoadingProgressHandler);
+                LoadingProgressHandler.SetHandler(MiniGameState.EntryPoint.LoadingProgressHandler);
 
                 entryPoint.GameFinished += OnGameFinished;
 
-                entryPoint.Initialize(_analyticsLogger, _saveProvider, _logger);
+                entryPoint.Initialize(AnalyticsLogger, SaveProvider, MiniGameLogger);
 
                 await entryPoint.Load();
 
-                _miniGameState.SetTask(RunMiniGame(cancellationToken));
+                MiniGameState.SetTask(RunMiniGame(cancellationToken));
 
-                await WaitForTaskWithCancellation(_miniGameState.RunningTask, cancellationToken);
+                await WaitForTaskWithCancellation(MiniGameState.RunningTask, cancellationToken);
             }
             catch (Exception ex)
             {
                 runningTaskSource.TrySetException(ex);
-                _logger.LogError(LogType.Exception.ToString(), $"Error during mini-game execution: {ex.Message}");
+                Logger.LogError(LogType.Exception.ToString(), $"Error during mini-game execution: {ex.Message}");
             }
             finally
             {
@@ -148,22 +153,55 @@ namespace com.appidea.MiniGamePlatform.Core
 
         public async Task ForceEndMiniGame()
         {
-            if (_miniGameState == null)
+            if (MiniGameState == null)
                 return;
 
             try
             {
-                _miniGameState.EntryPoint.ForceEndGame();
+                MiniGameState.EntryPoint.ForceEndGame();
             }
             catch (Exception ex)
             {
-                _logger.LogError(LogType.Exception.ToString(),
+                Logger.LogError(LogType.Exception.ToString(),
                     $"Error during forced mini-game termination: {ex.Message}");
             }
             finally
             {
                 await CleanupMiniGame();
             }
+        }
+
+        protected virtual string DecorateSaveProviderKey(string key)
+        {
+            if (MiniGameState == null)
+                throw new InvalidOperationException("Mini game is null. Cannot decorate key for save provider.");
+            if (MiniGameState.TaskCompletionSource.Task.IsCompleted)
+                throw new InvalidOperationException(
+                    $"Mini game `{MiniGameState.Name}` is already completed. Cannot decorate key for save provider.");
+
+            return $"{MiniGameState.Name}_{key}";
+        }
+
+        protected virtual string DecorateAnalyticsKey(string key)
+        {
+            if (MiniGameState == null)
+                throw new InvalidOperationException("Mini game is null. Cannot decorate key for analytics logger.");
+            if (MiniGameState.TaskCompletionSource.Task.IsCompleted)
+                throw new InvalidOperationException(
+                    $"Mini game `{MiniGameState.Name}` is already completed. Cannot decorate key for analytics logger.");
+
+            return $"{MiniGameState.Name}/{key}";
+        }
+
+        protected virtual string DecorateLogger(string message)
+        {
+            if (MiniGameState == null)
+                throw new InvalidOperationException("Mini game is null. Cannot decorate message for logger.");
+            if (MiniGameState.TaskCompletionSource.Task.IsCompleted)
+                throw new InvalidOperationException(
+                    $"Mini game `{MiniGameState.Name}` is already completed. Cannot decorate message for logger.");
+
+            return $"[{MiniGameState.Name}]: {message}";
         }
 
         private async Task WaitForTaskWithCancellation(Task task, CancellationToken cancellationToken)
@@ -181,50 +219,50 @@ namespace com.appidea.MiniGamePlatform.Core
         {
             try
             {
-                await _miniGameState.EntryPoint.GameEndAwaiter(cancellationToken);
+                await MiniGameState.EntryPoint.GameEndAwaiter(cancellationToken);
             }
             catch (OperationCanceledException)
             {
-                _logger.Log(LogType.Exception.ToString(), "Mini-game was canceled.");
-                _miniGameState.TaskCompletionSource.TrySetCanceled();
+                Logger.Log(LogType.Exception.ToString(), "Mini-game was canceled.");
+                MiniGameState.TaskCompletionSource.TrySetCanceled();
             }
             catch (Exception ex)
             {
-                _logger.LogError(LogType.Exception.ToString(), $"Error in mini-game: {ex.Message}");
-                _miniGameState.TaskCompletionSource.TrySetException(ex);
+                Logger.LogError(LogType.Exception.ToString(), $"Error in mini-game: {ex.Message}");
+                MiniGameState.TaskCompletionSource.TrySetException(ex);
             }
             finally
             {
-                await _miniGameState.EntryPoint.Unload();
-                _miniGameState.TaskCompletionSource.TrySetResult(null);
+                await MiniGameState.EntryPoint.Unload();
+                MiniGameState.TaskCompletionSource.TrySetResult(null);
             }
         }
 
         private async Task CleanupMiniGame()
         {
-            if (_miniGameState == null)
+            if (MiniGameState == null)
                 return;
 
             try
             {
-                _miniGameState.EntryPoint.GameFinished -= OnGameFinished;
-                SceneManager.SetActiveScene(_miniGameState.PrevScene);
-                await SceneManager.UnloadSceneAsync(_miniGameState.Scene).AsTask();
-                await _miniGameState.EntryPoint.DisposeAsync();
+                MiniGameState.EntryPoint.GameFinished -= OnGameFinished;
+                SceneManager.SetActiveScene(MiniGameState.PrevScene);
+                await SceneManager.UnloadSceneAsync(MiniGameState.Scene).AsTask();
+                await MiniGameState.EntryPoint.DisposeAsync();
             }
             catch (Exception ex)
             {
-                _logger.LogError(LogType.Exception.ToString(), $"Error during mini-game cleanup: {ex.Message}");
+                Logger.LogError(LogType.Exception.ToString(), $"Error during mini-game cleanup: {ex.Message}");
             }
             finally
             {
-                _miniGameState = null;
+                MiniGameState = null;
             }
         }
 
         private void OnGameFinished()
         {
-            _miniGameState?.TaskCompletionSource.TrySetResult(null);
+            MiniGameState?.TaskCompletionSource.TrySetResult(null);
         }
 
         private void EnsureMiniGameNameIsValid(string miniGameName)
@@ -232,14 +270,14 @@ namespace com.appidea.MiniGamePlatform.Core
             if (string.IsNullOrWhiteSpace(miniGameName))
                 throw new ArgumentException("Mini-game name cannot be null or empty.", nameof(miniGameName));
 
-            if (_config.MiniGameConfigs.Any(c => c.Config.MiniGameName == miniGameName) == false)
+            if (Config.MiniGameConfigs.Any(c => c.Config.MiniGameName == miniGameName) == false)
                 throw new ArgumentException("Mini-game name not found.", nameof(miniGameName));
         }
 
         private async Task<IResourceLocator> LoadCatalog(string miniGameName)
         {
             var miniGameBehaviourConfig =
-                _config.MiniGameConfigs.FirstOrDefault(c => c.Config.MiniGameName == miniGameName);
+                Config.MiniGameConfigs.FirstOrDefault(c => c.Config.MiniGameName == miniGameName);
             if (miniGameBehaviourConfig == null)
                 return null;
             var config = miniGameBehaviourConfig.Config;
@@ -279,7 +317,7 @@ namespace com.appidea.MiniGamePlatform.Core
             return entryPointGameObject.GetComponent<IMiniGameEntryPoint>();
         }
 
-        private sealed class RunningMiniGameState
+        protected sealed class RunningMiniGameState
         {
             public readonly string Name;
             public readonly Scene Scene;
