@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -64,7 +66,7 @@ namespace com.appidea.MiniGamePlatform.Core
             return true;
         }
 
-        public async Task<bool> PreloadGame(string miniGameName, CancellationToken cancellationToken)
+        public async Task<bool> PreloadGame(string miniGameName)
         {
             EnsureMiniGameNameIsValid(miniGameName);
 
@@ -85,7 +87,7 @@ namespace com.appidea.MiniGamePlatform.Core
             if (keysToDownload.Count <= 0)
                 return true;
 
-            var downloadHandle = Addressables.DownloadDependenciesAsync(keysToDownload);
+            var downloadHandle = Addressables.DownloadDependenciesAsync((IEnumerable)keysToDownload, Addressables.MergeMode.Union);
             await downloadHandle.Task;
 
             if (downloadHandle.Status != AsyncOperationStatus.Succeeded)
@@ -107,7 +109,7 @@ namespace com.appidea.MiniGamePlatform.Core
             try
             {
                 if (await IsMiniGameCacheReady(miniGameName) == false)
-                    if (await PreloadGame(miniGameName, cancellationToken) == false)
+                    if (await PreloadGame(miniGameName) == false)
                     {
                         _logger.LogError(LogType.Exception.ToString(), $"Failed to preload mini-game: {miniGameName}");
                         return;
@@ -240,10 +242,17 @@ namespace com.appidea.MiniGamePlatform.Core
                 _config.MiniGameConfigs.FirstOrDefault(c => c.Config.MiniGameName == miniGameName);
             if (miniGameBehaviourConfig == null)
                 return null;
+            var config = miniGameBehaviourConfig.Config;
 
             // todo load catalog from streaming assets if load type is MiniGameLoadType.BuiltIn 
 
-            var catalogPath = miniGameBehaviourConfig.Config.MiniGameName;
+            var catalogPath = MiniGamePlatformUtils.CombineUrl(
+                                  config.Url,
+                                  config.MiniGameName,
+                                  MiniGamePlatformUtils.GetPlatformTargetName(),
+                                  config.Version)
+                              + $"catalog_{config.Version}.json";
+
             var handle = Addressables.LoadContentCatalogAsync(catalogPath);
             await handle.Task;
 

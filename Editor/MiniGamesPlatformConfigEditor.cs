@@ -14,16 +14,48 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
 
         public override void OnInspectorGUI()
         {
-            base.OnInspectorGUI();
+            var platformConfig = (MiniGamesPlatformConfig)target;
 
-            var config = (MiniGamesPlatformConfig)target;
+            EditorGUILayout.LabelField("MiniGame Behaviour Configs", EditorStyles.boldLabel);
+
+            for (int i = 0; i < platformConfig.MiniGameConfigs.Count; i++)
+            {
+                var behaviourConfig = platformConfig.MiniGameConfigs[i];
+
+                EditorGUILayout.BeginVertical("box");
+                EditorGUILayout.LabelField($"Config {i + 1}", EditorStyles.boldLabel);
+
+                using (new EditorGUI.DisabledGroupScope(true))
+                {
+                    EditorGUILayout.ObjectField("Config", behaviourConfig.Config, typeof(MiniGameConfig), false);
+
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.TextField("MiniGame Name", behaviourConfig.Config.MiniGameName);
+                    EditorGUILayout.TextField("Version", behaviourConfig.Config.Version);
+                    EditorGUILayout.TextField("URL", behaviourConfig.Config.Url);
+                    EditorGUI.indentLevel--;
+
+                    EditorGUILayout.EnumPopup("LoadType", behaviourConfig.LoadType);
+                }
+
+                if (GUILayout.Button("Remove"))
+                {
+                    platformConfig.MiniGameConfigs.RemoveAt(i);
+                    break;
+                }
+
+                EditorGUILayout.EndVertical();
+            }
+
+            if (GUI.changed)
+                EditorUtility.SetDirty(platformConfig);
 
             EditorGUILayout.Space();
 
             if (GUILayout.Button("Scan for mini games"))
-                TryFindNotConnectedMiniGames(config);
+                TryFindNotConnectedMiniGames(platformConfig);
 
-            RenderNewConfigsControls(config);
+            RenderNewConfigsControls(platformConfig);
         }
 
         private void OnDisable()

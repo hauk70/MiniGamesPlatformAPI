@@ -18,6 +18,8 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
             if (data.Length == 0)
             {
                 var instance = ScriptableObject.CreateInstance<MiniGamesPlatformConfig>();
+                AssetDatabase.CreateAsset(instance, "Assets/MiniGamesPlatformConfig.asset");
+                AssetDatabase.SaveAssets();
                 Selection.activeObject = instance;
                 return;
             }

@@ -13,7 +13,7 @@ namespace com.appidea.MiniGamePlatform.Core
         IMiniGameLoadingProgressHandler MiniGameLoadingProgressHandler { get; } 
         
         Task<bool> IsMiniGameCacheReady(string miniGameName);
-        Task<bool> PreloadGame(string miniGameName, CancellationToken cancellationToken);
+        Task<bool> PreloadGame(string miniGameName);
 
         Task LoadAndRunMiniGame(string miniGameName, CancellationToken cancellationToken);
     }

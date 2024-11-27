@@ -1,17 +1,19 @@
 using System;
 using com.appidea.MiniGamePlatform.CommunicationAPI;
+using UnityEngine;
 
 namespace com.appidea.MiniGamePlatform.Core
 {
     [Serializable]
     public class MiniGameBehaviourConfig
     {
-        public readonly MiniGameConfig Config;
+        public MiniGameConfig Config => config;
+        [SerializeField] private MiniGameConfig config;
         public MiniGameLoadType LoadType;
 
         public MiniGameBehaviourConfig(MiniGameConfig config, MiniGameLoadType loadType)
         {
-            Config = config;
+            this.config = config;
             LoadType = loadType;
         }
     }
