@@ -32,10 +32,10 @@ namespace com.appidea.MiniGamePlatform.Core
             return _innerSaveProvider.GetFloat(modifiedKey, defaultValue);
         }
 
-        public string GetFloat(string key, string defaultValue)
+        public string GetString(string key, string defaultValue)
         {
             var modifiedKey = _keyDecorator(key);
-            return _innerSaveProvider.GetFloat(modifiedKey, defaultValue);
+            return _innerSaveProvider.GetString(modifiedKey, defaultValue);
         }
     }
 }
