@@ -309,12 +309,17 @@ namespace com.appidea.MiniGamePlatform.Core
         private async Task<IMiniGameEntryPoint> CreateEntryPoint(IResourceLocator catalog, Scene scene)
         {
             if (catalog.Locate(MiniGamePlatformConstants.EntryPointAddress, typeof(GameObject), out var d) == false)
-                throw new Exception($"Entry point not found in catalog `{catalog.LocatorId}`");
+                throw new Exception($"Entry point not found in the catalog `{catalog.LocatorId}`");
 
             var prefab = await Addressables.LoadAssetAsync<GameObject>(d.First()).Task;
             var entryPointGameObject = UnityEngine.Object.Instantiate(prefab);
             SceneManager.MoveGameObjectToScene(entryPointGameObject, scene);
-            return entryPointGameObject.GetComponent<IMiniGameEntryPoint>();
+            var entryPoint = entryPointGameObject.GetComponent<IMiniGameEntryPoint>();
+
+            if(entryPoint == null)
+                throw new Exception($"Entry point not found in the game object `{entryPointGameObject}`");
+
+            return entryPoint;
         }
 
         protected sealed class RunningMiniGameState

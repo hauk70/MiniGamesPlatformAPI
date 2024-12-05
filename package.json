@@ -1,7 +1,7 @@
 {
     "name": "com.appidea.minigameplatform.core",
     "version": "1.0.0",
-    "displayName": "",
+    "displayName": "MiniGames Core API",
     "description": "",
     "unity": "2022.3",
     "author": {
