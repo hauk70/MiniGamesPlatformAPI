@@ -4,7 +4,8 @@
     "references": [
         "com.appidea.MiniGamePlatform.CommunicationAPI",
         "Unity.Addressables",
-        "Unity.ResourceManager"
+        "Unity.ResourceManager",
+        "Unity.RenderPipelines.Core.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

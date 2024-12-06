@@ -30,6 +30,7 @@ namespace com.appidea.MiniGamePlatform.Core
         public IMiniGameLoadingProgressHandler MiniGameLoadingProgressHandler => LoadingProgressHandler;
 
         protected readonly MiniGamesPlatformConfig Config;
+        protected readonly IRenderPipelineManager RenderPipelineManager;
         protected readonly ISaveProvider SaveProvider;
         protected readonly IAnalyticsLogger AnalyticsLogger;
         protected readonly ILogger Logger;
@@ -40,10 +41,12 @@ namespace com.appidea.MiniGamePlatform.Core
 
         protected RunningMiniGameState MiniGameState;
 
-        public BaseMiniGamesPlatformManager(MiniGamesPlatformConfig config, ISaveProvider saveProvider,
-            IAnalyticsLogger analyticsLogger, ILogger logger)
+        public BaseMiniGamesPlatformManager(MiniGamesPlatformConfig config,
+            IRenderPipelineManager renderPipelineManager, ISaveProvider saveProvider, IAnalyticsLogger analyticsLogger,
+            ILogger logger)
         {
             Config = config;
+            RenderPipelineManager = renderPipelineManager;
             SaveProvider = new MiniGameSaveProvider(saveProvider, DecorateSaveProviderKey);
             AnalyticsLogger = new MiniGameAnalyticsLogger(analyticsLogger, DecorateAnalyticsKey);
             Logger = logger;
@@ -108,6 +111,7 @@ namespace com.appidea.MiniGamePlatform.Core
                 throw new InvalidOperationException("Another mini-game is already running.");
 
             EnsureMiniGameNameIsValid(miniGameName);
+            var miniGameConfig = Config.MiniGameConfigs.First(c => c.Config.MiniGameName == miniGameName);
 
             var runningTaskSource = new TaskCompletionSource<object>();
 
@@ -131,6 +135,9 @@ namespace com.appidea.MiniGamePlatform.Core
                 LoadingProgressHandler.SetHandler(MiniGameState.EntryPoint.LoadingProgressHandler);
 
                 entryPoint.GameFinished += OnGameFinished;
+
+                if (miniGameConfig.Config.CustomRenderPipelineAsset != null)
+                    RenderPipelineManager.OverrideRenderPipeline(miniGameConfig.Config.CustomRenderPipelineAsset);
 
                 entryPoint.Initialize(AnalyticsLogger, SaveProvider, MiniGameLogger);
 
@@ -246,6 +253,8 @@ namespace com.appidea.MiniGamePlatform.Core
             try
             {
                 MiniGameState.EntryPoint.GameFinished -= OnGameFinished;
+                if(RenderPipelineManager.AreSettingsOverridden())
+                    RenderPipelineManager.RestoreOriginalSettings();
                 SceneManager.SetActiveScene(MiniGameState.PrevScene);
                 await SceneManager.UnloadSceneAsync(MiniGameState.Scene).AsTask();
                 await MiniGameState.EntryPoint.DisposeAsync();
@@ -316,7 +325,7 @@ namespace com.appidea.MiniGamePlatform.Core
             SceneManager.MoveGameObjectToScene(entryPointGameObject, scene);
             var entryPoint = entryPointGameObject.GetComponent<IMiniGameEntryPoint>();
 
-            if(entryPoint == null)
+            if (entryPoint == null)
                 throw new Exception($"Entry point not found in the game object `{entryPointGameObject}`");
 
             return entryPoint;
