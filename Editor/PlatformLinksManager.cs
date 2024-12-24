@@ -1,6 +1,8 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Unity.Plastic.Newtonsoft.Json.Linq;
 using UnityEditor;
 
 namespace com.appidea.MiniGamePlatform.Core.Editor
@@ -28,10 +30,12 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
             builder.AppendLine("<linker>");
             foreach (var assemblyName in platformConfig.MiniGameConfigs
                          .Select(GetAssemblyName)
+                         .Where(name => name != null)
                          .Distinct())
             {
                 builder.AppendLine($"  <assembly fullname=\"{assemblyName}\" preserve=\"all\" />");
             }
+
             builder.AppendLine("</linker>");
 
             if (File.Exists(FullLinkerPath) && File.ReadAllText(FullLinkerPath) == builder.ToString())
@@ -43,8 +47,36 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
 
         private static string GetAssemblyName(MiniGameBehaviourConfig config)
         {
-            var assembly = config?.Config?.GetType().Assembly;
-            return assembly?.GetName().Name ?? "UnknownAssembly";
+            var configAssetPath = AssetDatabase.GetAssetPath(config?.Config);
+            if (string.IsNullOrEmpty(configAssetPath))
+                return null;
+
+            var packagePath = Path.GetDirectoryName(configAssetPath);
+            var asmdefFiles = Directory.GetFiles(packagePath, "*.asmdef", SearchOption.AllDirectories);
+
+            foreach (var asmdefFile in asmdefFiles)
+            {
+                var asmdefContent = File.ReadAllText(asmdefFile);
+                var assemblyName = ExtractAssemblyNameFromAsmdef(asmdefContent);
+                if (!string.IsNullOrEmpty(assemblyName))
+                    return assemblyName;
+            }
+
+            return null;
+        }
+
+        private static string ExtractAssemblyNameFromAsmdef(string asmdefContent)
+        {
+            try
+            {
+                var json = JObject.Parse(asmdefContent);
+                var assemblyName = json["name"]?.ToString();
+                return assemblyName;
+            }
+            catch
+            {
+                return null; 
+            }
         }
     }
 }
