@@ -40,7 +40,7 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
 
                 if (GUILayout.Button("Remove"))
                 {
-                    platformConfig.MiniGameConfigs.RemoveAt(i);
+                    RemoveConfig(platformConfig, i);
                     break;
                 }
 
@@ -70,12 +70,20 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
 
             var allConfigs = AssetDatabase.FindAssets($"t:{nameof(MiniGameConfig)}")
                 .Select(AssetDatabase.GUIDToAssetPath)
-                .Select(AssetDatabase.LoadAssetAtPath<MiniGameConfig>);
+                .Select(AssetDatabase.LoadAssetAtPath<MiniGameConfig>)
+                .ToArray();
             var presentConfigs = coreConfig.MiniGameConfigs
                 .Select(c => c.Config);
 
             _newConfigs.AddRange(allConfigs.Where(c => presentConfigs.Contains(c) == false));
             _isScanned = true;
+        }
+
+        private void RemoveConfig(MiniGamesPlatformConfig platformConfig, int i)
+        {
+            var config = platformConfig.MiniGameConfigs[i];
+            platformConfig.MiniGameConfigs.RemoveAt(i);
+            PlatformLinksManager.RemoveConfig(platformConfig, new[] { config });
         }
 
         private void RenderNewConfigsControls(MiniGamesPlatformConfig coreConfig)
@@ -92,8 +100,11 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
 
             if (GUILayout.Button("Add all"))
             {
-                coreConfig.MiniGameConfigs.AddRange(_newConfigs.Select(c =>
-                    new MiniGameBehaviourConfig(c, MiniGameLoadType.RemoteLoad)));
+                var newBehaviourConfigs = _newConfigs
+                    .Select(c => new MiniGameBehaviourConfig(c, MiniGameLoadType.RemoteLoad))
+                    .ToArray();
+                coreConfig.MiniGameConfigs.AddRange(newBehaviourConfigs);
+                PlatformLinksManager.AddNewConfigs(coreConfig, newBehaviourConfigs);
 
                 EditorUtility.SetDirty(coreConfig);
                 AssetDatabase.SaveAssets();
