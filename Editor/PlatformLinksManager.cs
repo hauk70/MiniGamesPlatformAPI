@@ -1,6 +1,7 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
+using System.Xml;
 using Unity.Plastic.Newtonsoft.Json.Linq;
 using UnityEditor;
 
@@ -8,40 +9,102 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
 {
     public static class PlatformLinksManager
     {
+        private enum OperationType
+        {
+            Add,
+            Remove,
+            Rebuild
+        }
+
         private const string LinkerFolderPath = "Assets";
         private const string LinkerFileName = "link.xml";
         private static string FullLinkerPath => Path.Combine(LinkerFolderPath, LinkerFileName);
 
-        public static void RemoveConfig(MiniGamesPlatformConfig platformConfig, MiniGameBehaviourConfig[] configs)
+        public static void RemoveConfig(MiniGameBehaviourConfig[] configs)
         {
-            UpdateLinkXml(platformConfig);
+            ModifyLinkXml(configs, OperationType.Remove);
         }
 
-        public static void AddNewConfigs(MiniGamesPlatformConfig platformConfig,
-            MiniGameBehaviourConfig[] newBehaviourConfigs)
+        public static void AddNewConfigs(MiniGameBehaviourConfig[] newBehaviourConfigs)
         {
-            UpdateLinkXml(platformConfig);
+            ModifyLinkXml(newBehaviourConfigs, OperationType.Add);
         }
 
-        private static void UpdateLinkXml(MiniGamesPlatformConfig platformConfig)
+        public static void RebuildConfigs(MiniGameBehaviourConfig[] configs)
         {
-            var builder = new StringBuilder();
-            builder.AppendLine("<linker>");
-            foreach (var assemblyName in platformConfig.MiniGameConfigs
-                         .Select(GetAssemblyName)
-                         .Where(name => name != null)
-                         .Distinct())
+            ModifyLinkXml(configs, OperationType.Rebuild);
+        }
+
+        private static void ModifyLinkXml(MiniGameBehaviourConfig[] configs, OperationType operation)
+        {
+            var assemblyNames = configs.Select(GetAssemblyName)
+                .Where(name => name != null)
+                .Distinct()
+                .ToHashSet();
+
+            var xmlDoc = new XmlDocument();
+            if (File.Exists(FullLinkerPath) && operation != OperationType.Rebuild)
+                xmlDoc.Load(FullLinkerPath);
+            else
+                xmlDoc.LoadXml("<linker></linker>");
+
+            var linkerNode = xmlDoc.SelectSingleNode("linker") ?? xmlDoc.AppendChild(xmlDoc.CreateElement("linker"));
+
+            switch (operation)
             {
-                builder.AppendLine($"  <assembly fullname=\"{assemblyName}\" preserve=\"all\" />");
+                case OperationType.Add:
+                    AddAssemblies(xmlDoc, linkerNode, assemblyNames);
+                    break;
+
+                case OperationType.Remove:
+                    RemoveAssemblies(linkerNode, assemblyNames);
+                    break;
+
+                case OperationType.Rebuild:
+                    RebuildAssemblies(xmlDoc, linkerNode, assemblyNames);
+                    break;
             }
 
-            builder.AppendLine("</linker>");
-
-            if (File.Exists(FullLinkerPath) && File.ReadAllText(FullLinkerPath) == builder.ToString())
-                return;
-
-            File.WriteAllText(FullLinkerPath, builder.ToString());
+            xmlDoc.Save(FullLinkerPath);
             AssetDatabase.Refresh();
+        }
+
+        private static void AddAssemblies(XmlDocument xmlDoc, XmlNode linkerNode, HashSet<string> assemblyNames)
+        {
+            foreach (var assemblyName in assemblyNames)
+            {
+                var existingNode = linkerNode.SelectSingleNode($"assembly[@fullname='{assemblyName}']");
+                if (existingNode == null)
+                {
+                    var newAssemblyNode = xmlDoc.CreateElement("assembly");
+                    newAssemblyNode.SetAttribute("fullname", assemblyName);
+                    newAssemblyNode.SetAttribute("preserve", "all");
+                    linkerNode.AppendChild(newAssemblyNode);
+                }
+            }
+        }
+
+        private static void RemoveAssemblies(XmlNode linkerNode, HashSet<string> assemblyNames)
+        {
+            foreach (var assemblyName in assemblyNames)
+            {
+                var existingNode = linkerNode.SelectSingleNode($"assembly[@fullname='{assemblyName}']");
+                if (existingNode != null)
+                    linkerNode.RemoveChild(existingNode);
+            }
+        }
+
+        private static void RebuildAssemblies(XmlDocument xmlDoc, XmlNode linkerNode, HashSet<string> assemblyNames)
+        {
+            linkerNode.RemoveAll(); 
+
+            foreach (var assemblyName in assemblyNames)
+            {
+                var newAssemblyNode = xmlDoc.CreateElement("assembly");
+                newAssemblyNode.SetAttribute("fullname", assemblyName);
+                newAssemblyNode.SetAttribute("preserve", "all");
+                linkerNode.AppendChild(newAssemblyNode);
+            }
         }
 
         private static string GetAssemblyName(MiniGameBehaviourConfig config)
@@ -74,7 +137,7 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
             }
             catch
             {
-                return null; 
+                return null;
             }
         }
     }

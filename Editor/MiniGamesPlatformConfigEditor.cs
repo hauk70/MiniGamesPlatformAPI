@@ -10,38 +10,80 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
     public class MiniGamesPlatformConfigEditor : UnityEditor.Editor
     {
         private readonly List<MiniGameConfig> _newConfigs = new List<MiniGameConfig>();
-        private bool _isScanned;
+
+        private bool _isListExpanded = true;
+        private readonly List<bool> _isItemExpanded = new List<bool>();
+        private readonly Dictionary<MiniGameConfig, bool> _isNewItemExpanded = new Dictionary<MiniGameConfig, bool>();
+
+        private bool _isNewConfigsListExpanded = true;
 
         public override void OnInspectorGUI()
         {
             var platformConfig = (MiniGamesPlatformConfig)target;
 
-            EditorGUILayout.LabelField("MiniGame Behaviour Configs", EditorStyles.boldLabel);
+            RenderPresentConfigs(platformConfig);
 
-            for (int i = 0; i < platformConfig.MiniGameConfigs.Count; i++)
+            EditorGUILayout.Space();
+
+            if (GUILayout.Button("Scan for mini games"))
+                TryFindNotConnectedMiniGames(platformConfig);
+
+            RenderNewConfigsList(_newConfigs, platformConfig);
+
+            if (GUILayout.Button("Rebuild link.xml"))
+                PlatformLinksManager.RebuildConfigs(platformConfig.MiniGameConfigs.ToArray());
+        }
+
+        private void OnDisable()
+        {
+            _newConfigs.Clear();
+        }
+
+        private void RenderPresentConfigs(MiniGamesPlatformConfig platformConfig)
+        {
+            _isListExpanded = EditorGUILayout.Foldout(_isListExpanded, "MiniGame Configs", true);
+            if (_isListExpanded)
             {
-                var behaviourConfig = platformConfig.MiniGameConfigs[i];
+                while (_isItemExpanded.Count < platformConfig.MiniGameConfigs.Count)
+                    _isItemExpanded.Add(true);
+                while (_isItemExpanded.Count > platformConfig.MiniGameConfigs.Count)
+                    _isItemExpanded.RemoveAt(_isItemExpanded.Count - 1);
 
                 EditorGUILayout.BeginVertical("box");
-                EditorGUILayout.LabelField($"Config {i + 1}", EditorStyles.boldLabel);
-
-                using (new EditorGUI.DisabledGroupScope(true))
+                for (int i = 0; i < platformConfig.MiniGameConfigs.Count; i++)
                 {
-                    EditorGUILayout.ObjectField("Config", behaviourConfig.Config, typeof(MiniGameConfig), false);
+                    var behaviourConfig = platformConfig.MiniGameConfigs[i];
 
-                    EditorGUI.indentLevel++;
-                    EditorGUILayout.TextField("MiniGame Name", behaviourConfig.Config.MiniGameName);
-                    EditorGUILayout.TextField("Version", behaviourConfig.Config.Version);
-                    EditorGUILayout.TextField("URL", behaviourConfig.Config.Url);
-                    EditorGUI.indentLevel--;
+                    EditorGUILayout.BeginHorizontal();
+                    GUILayout.Space(15);
+                    _isItemExpanded[i] =
+                        EditorGUILayout.Foldout(_isItemExpanded[i], behaviourConfig.Config.MiniGameName, true);
+                    EditorGUILayout.EndHorizontal();
 
-                    EditorGUILayout.EnumPopup("LoadType", behaviourConfig.LoadType);
-                }
+                    if (!_isItemExpanded[i])
+                        continue;
 
-                if (GUILayout.Button("Remove"))
-                {
-                    RemoveConfig(platformConfig, i);
-                    break;
+                    EditorGUILayout.BeginVertical("box");
+                    using (new EditorGUI.DisabledGroupScope(true))
+                    {
+                        EditorGUILayout.ObjectField("Config", behaviourConfig.Config, typeof(MiniGameConfig),
+                            false);
+
+                        EditorGUI.indentLevel++;
+                        EditorGUILayout.TextField("Version", behaviourConfig.Config.Version);
+                        EditorGUILayout.TextField("URL", behaviourConfig.Config.Url);
+                        EditorGUI.indentLevel--;
+
+                        EditorGUILayout.EnumPopup("LoadType", behaviourConfig.LoadType);
+                    }
+
+                    if (GUILayout.Button("Remove"))
+                    {
+                        RemoveConfig(platformConfig, i);
+                        break;
+                    }
+
+                    EditorGUILayout.EndVertical();
                 }
 
                 EditorGUILayout.EndVertical();
@@ -49,19 +91,80 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
 
             if (GUI.changed)
                 EditorUtility.SetDirty(platformConfig);
-
-            EditorGUILayout.Space();
-
-            if (GUILayout.Button("Scan for mini games"))
-                TryFindNotConnectedMiniGames(platformConfig);
-
-            RenderNewConfigsControls(platformConfig);
         }
 
-        private void OnDisable()
+        public void RenderNewConfigsList(List<MiniGameConfig> newConfigs, MiniGamesPlatformConfig platformConfig)
         {
-            _newConfigs.Clear();
-            _isScanned = false;
+            if (newConfigs == null || newConfigs.Count == 0)
+            {
+                _isNewConfigsListExpanded = false;
+                return;
+            }
+
+            _isNewConfigsListExpanded =
+                EditorGUILayout.Foldout(_isNewConfigsListExpanded, "New MiniGame Configs", true);
+            if (_isNewConfigsListExpanded == false)
+                return;
+
+            EditorGUILayout.HelpBox($"Found {newConfigs.Count} new mini game{(newConfigs.Count > 1 ? "s" : "")}.",
+                MessageType.Info);
+
+            EditorGUILayout.BeginVertical("box");
+            for (var i = 0; i < newConfigs.Count; i++)
+            {
+                var current = newConfigs[i];
+
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(15);
+                if (_isNewItemExpanded.ContainsKey(current) == false)
+                    _isNewItemExpanded.Add(current, false);
+                _isNewItemExpanded[current] = EditorGUILayout.Foldout(_isNewItemExpanded[current], current.MiniGameName, true);
+                EditorGUILayout.EndHorizontal();
+
+                if (_isNewItemExpanded[current] == false)
+                    continue;
+
+                EditorGUILayout.BeginVertical("box");
+                using (new EditorGUI.DisabledGroupScope(true))
+                {
+                    EditorGUILayout.ObjectField("Config", current, typeof(MiniGameConfig), false);
+
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.TextField("MiniGame Name", current.MiniGameName);
+                    EditorGUILayout.TextField("Version", current.Version);
+                    EditorGUILayout.TextField("URL", current.Url);
+                    EditorGUI.indentLevel--;
+                }
+
+                if (GUILayout.Button("Add"))
+                {
+                    newConfigs.RemoveAt(i);
+                    _isNewItemExpanded.Remove(current);
+                    AddConfigs(new[] { current });
+
+                    return;
+                }
+
+                EditorGUILayout.EndVertical();
+            }
+
+            EditorGUILayout.EndVertical();
+
+            if (GUILayout.Button("Add all"))
+                AddConfigs(newConfigs.ToArray());
+
+            void AddConfigs(MiniGameConfig[] configs)
+            {
+                var newBehaviourConfigs = configs
+                    .Select(c => new MiniGameBehaviourConfig(c, MiniGameLoadType.RemoteLoad))
+                    .ToArray();
+                platformConfig.MiniGameConfigs.AddRange(newBehaviourConfigs);
+                PlatformLinksManager.AddNewConfigs(newBehaviourConfigs);
+
+                EditorUtility.SetDirty(platformConfig);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+            }
         }
 
         private void TryFindNotConnectedMiniGames(MiniGamesPlatformConfig coreConfig)
@@ -76,40 +179,14 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
                 .Select(c => c.Config);
 
             _newConfigs.AddRange(allConfigs.Where(c => presentConfigs.Contains(c) == false));
-            _isScanned = true;
+            _isNewConfigsListExpanded = true;
         }
 
         private void RemoveConfig(MiniGamesPlatformConfig platformConfig, int i)
         {
             var config = platformConfig.MiniGameConfigs[i];
             platformConfig.MiniGameConfigs.RemoveAt(i);
-            PlatformLinksManager.RemoveConfig(platformConfig, new[] { config });
-        }
-
-        private void RenderNewConfigsControls(MiniGamesPlatformConfig coreConfig)
-        {
-            if (_newConfigs.Count == 0)
-            {
-                if (_isScanned)
-                    GUILayout.Label($"Did not find any new mini games", EditorStyles.boldLabel);
-                return;
-            }
-
-            GUILayout.Label($"Found {_newConfigs.Count} new mini game{(_newConfigs.Count > 1 ? "s" : "")}",
-                EditorStyles.boldLabel);
-
-            if (GUILayout.Button("Add all"))
-            {
-                var newBehaviourConfigs = _newConfigs
-                    .Select(c => new MiniGameBehaviourConfig(c, MiniGameLoadType.RemoteLoad))
-                    .ToArray();
-                coreConfig.MiniGameConfigs.AddRange(newBehaviourConfigs);
-                PlatformLinksManager.AddNewConfigs(coreConfig, newBehaviourConfigs);
-
-                EditorUtility.SetDirty(coreConfig);
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
-            }
+            PlatformLinksManager.RemoveConfig(new[] { config });
         }
     }
 }
