@@ -160,6 +160,7 @@ namespace com.appidea.MiniGamePlatform.Core
             {
                 taskSource.TrySetException(ex);
                 Logger.LogError(LogType.Exception.ToString(), $"Error during mini-game execution: {ex.Message}\n{ex.StackTrace}");
+                _miniGameRunningBehaviour.SetException(ex);
             }
             finally
             {
@@ -181,6 +182,7 @@ namespace com.appidea.MiniGamePlatform.Core
             {
                 Logger.LogError(LogType.Exception.ToString(),
                     $"Error during forced mini-game termination: {ex.Message}");
+                _miniGameRunningBehaviour.SetException(ex);
             }
             finally
             {
@@ -237,6 +239,7 @@ namespace com.appidea.MiniGamePlatform.Core
             {
                 Logger.LogError(LogType.Exception.ToString(), $"Error in mini-game: {ex.Message}");
                 _miniGameRunningBehaviour.TaskCompletionSource.TrySetException(ex);
+                _miniGameRunningBehaviour.SetException(ex);
             }
             finally
             {
@@ -269,6 +272,7 @@ namespace com.appidea.MiniGamePlatform.Core
             catch (Exception ex)
             {
                 Logger.LogError(LogType.Exception.ToString(), $"Error during mini-game cleanup: {ex.Message}");
+                _miniGameRunningBehaviour.SetException(ex);
             }
             finally
             {

@@ -8,8 +8,10 @@ namespace com.appidea.MiniGamePlatform.Core
     public class MiniGameRunningBehaviour : IMiniGameRunningBehaviour
     {
         public event Action<MiniGameState> StateChanged;
+        public event Action<Exception> ExceptionHappened;
         public MiniGameState State { get; private set; } = MiniGameState.None;
         public string Name { get; }
+        public Exception LastException { get; private set; }
         public RunningMiniGameStateData StateData { get; private set; }
         public CancellationToken CancellationToken { get; }
         public Task ActiveTask { get; private set; }
@@ -44,6 +46,12 @@ namespace com.appidea.MiniGamePlatform.Core
 
             State = state;
             StateChanged?.Invoke(State);
+        }
+
+        public void SetException(Exception exception)
+        {
+            LastException = exception;
+            ExceptionHappened?.Invoke(exception);
         }
 
         public void SetStateData(RunningMiniGameStateData stateData)
