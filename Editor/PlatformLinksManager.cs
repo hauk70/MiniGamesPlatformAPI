@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -10,7 +9,7 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
     public static class PlatformLinksManager
     {
         private const string LinkerFolderPath = "Assets";
-        private const string LinkerFileName = "MiniGamesPlatform.link.xml";
+        private const string LinkerFileName = "link.xml";
         private static string FullLinkerPath => Path.Combine(LinkerFolderPath, LinkerFileName);
 
         public static void RemoveConfig(MiniGamesPlatformConfig platformConfig, MiniGameBehaviourConfig[] configs)
