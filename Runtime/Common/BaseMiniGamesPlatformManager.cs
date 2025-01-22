@@ -115,8 +115,9 @@ namespace com.appidea.MiniGamePlatform.Core
                 loadingProgressHandler,
                 unloadingProgressHandler
             );
-            
-            _miniGameRunningBehaviour.SetTask(RunMiniGameAsync(miniGameConfig, cancellationToken, taskCompletionSource));
+
+            _miniGameRunningBehaviour.SetTask(RunMiniGameAsync(miniGameConfig, cancellationToken,
+                taskCompletionSource));
             return MiniGameRunningBehaviour;
         }
 
@@ -159,7 +160,8 @@ namespace com.appidea.MiniGamePlatform.Core
             catch (Exception ex)
             {
                 taskSource.TrySetException(ex);
-                Logger.LogError(LogType.Exception.ToString(), $"Error during mini-game execution: {ex.Message}\n{ex.StackTrace}");
+                Logger.LogError(LogType.Exception.ToString(),
+                    $"Error during mini-game execution: {ex.Message}\n{ex.StackTrace}");
                 _miniGameRunningBehaviour.SetException(ex);
             }
             finally
@@ -257,15 +259,23 @@ namespace com.appidea.MiniGamePlatform.Core
 
             try
             {
-                MiniGameRunningBehaviour.StateData.EntryPoint.GameFinished -= OnGameFinished;
-                MiniGameRunningBehaviour.StateData.EntryPoint.LoadingProgressHandler.ProgressChanged -=
-                    OnEntryPointLoadingProgressChanged;
+                if (MiniGameRunningBehaviour.StateData.EntryPoint != null)
+                {
+                    MiniGameRunningBehaviour.StateData.EntryPoint.GameFinished -= OnGameFinished;
+                    MiniGameRunningBehaviour.StateData.EntryPoint.LoadingProgressHandler.ProgressChanged -=
+                        OnEntryPointLoadingProgressChanged;
+                }
 
                 if (RenderPipelineManager.AreSettingsOverridden())
                     RenderPipelineManager.RestoreOriginalSettings();
-                SceneManager.SetActiveScene(MiniGameRunningBehaviour.StateData.PrevScene);
-                await SceneManager.UnloadSceneAsync(MiniGameRunningBehaviour.StateData.Scene).AsTask();
-                await MiniGameRunningBehaviour.StateData.EntryPoint.DisposeAsync();
+
+                if (MiniGameRunningBehaviour.StateData.Scene.IsValid())
+                {
+                    SceneManager.SetActiveScene(MiniGameRunningBehaviour.StateData.PrevScene);
+                    await SceneManager.UnloadSceneAsync(MiniGameRunningBehaviour.StateData.Scene).AsTask();
+                    if (MiniGameRunningBehaviour.StateData.EntryPoint != null)
+                        await MiniGameRunningBehaviour.StateData.EntryPoint.DisposeAsync();
+                }
 
                 _miniGameRunningBehaviour.SetState(MiniGameState.Finished);
             }
