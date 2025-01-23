@@ -16,7 +16,6 @@ namespace com.appidea.MiniGamePlatform.Core
     /*
      * TODO
      * subscribe to unity`s log message event to detect exceptions from mini games (current mini game) to force stop it
-     * simple preloader
      * builtin mini-games
      */
 
@@ -95,7 +94,8 @@ namespace com.appidea.MiniGamePlatform.Core
             return true;
         }
 
-        public IMiniGameRunningBehaviour LoadAndRunMiniGame(string miniGameName, CancellationToken cancellationToken)
+        public IMiniGameRunningBehaviour LoadAndRunMiniGame(string miniGameName, CancellationToken cancellationToken,
+            GameOverScreenData gameOverScreenData = null)
         {
             if (MiniGameRunningBehaviour != null)
                 throw new InvalidOperationException("Another mini-game is already running.");
@@ -116,13 +116,14 @@ namespace com.appidea.MiniGamePlatform.Core
                 unloadingProgressHandler
             );
 
-            _miniGameRunningBehaviour.SetTask(RunMiniGameAsync(miniGameConfig, cancellationToken,
+            _miniGameRunningBehaviour.SetTask(RunMiniGameAsync(miniGameConfig, gameOverScreenData, cancellationToken,
                 taskCompletionSource));
             return MiniGameRunningBehaviour;
         }
 
-        private async Task RunMiniGameAsync(MiniGameBehaviourConfig miniGameConfig, CancellationToken cancellationToken,
-            TaskCompletionSource<object> taskSource)
+        private async Task
+            RunMiniGameAsync(MiniGameBehaviourConfig miniGameConfig, GameOverScreenData gameOverScreenData,
+                CancellationToken cancellationToken, TaskCompletionSource<object> taskSource)
         {
             try
             {
@@ -141,7 +142,7 @@ namespace com.appidea.MiniGamePlatform.Core
                 _miniGameRunningBehaviour.SetStateData(
                     new RunningMiniGameStateData(miniGameScene, prevScene, entryPoint));
 
-                entryPoint.GameFinished += OnGameFinished;
+                entryPoint.MessageSent += OnMiniGameMessageReceived;
                 entryPoint.LoadingProgressHandler.ProgressChanged += OnEntryPointLoadingProgressChanged;
 
                 if (miniGameConfig.Config.CustomRenderPipelineAsset != null)
@@ -149,7 +150,9 @@ namespace com.appidea.MiniGamePlatform.Core
 
                 _miniGameRunningBehaviour.SetState(MiniGameState.Initializing);
 
-                entryPoint.Initialize(AnalyticsLogger, SaveProvider, MiniGameLogger);
+                var runArguments =
+                    new MiniGameRunArguments(AnalyticsLogger, SaveProvider, MiniGameLogger, gameOverScreenData);
+                entryPoint.Initialize(runArguments);
 
                 _miniGameRunningBehaviour.SetState(MiniGameState.Loading);
 
@@ -261,7 +264,7 @@ namespace com.appidea.MiniGamePlatform.Core
             {
                 if (MiniGameRunningBehaviour.StateData.EntryPoint != null)
                 {
-                    MiniGameRunningBehaviour.StateData.EntryPoint.GameFinished -= OnGameFinished;
+                    MiniGameRunningBehaviour.StateData.EntryPoint.MessageSent -= OnMiniGameMessageReceived;
                     MiniGameRunningBehaviour.StateData.EntryPoint.LoadingProgressHandler.ProgressChanged -=
                         OnEntryPointLoadingProgressChanged;
                 }
@@ -290,9 +293,19 @@ namespace com.appidea.MiniGamePlatform.Core
             }
         }
 
-        private void OnGameFinished()
+        private void OnMiniGameMessageReceived(IMessage message)
         {
-            _miniGameRunningBehaviour?.TaskCompletionSource.TrySetResult(null);
+            switch (message)
+            {
+                case GameFinished _:
+                case GameFinishedRunNextMiniGame _:
+                    _miniGameRunningBehaviour?.TaskCompletionSource.TrySetResult(null);
+                    break;
+                default:
+                    throw new NotImplementedException($"Unhandled message type: {message.GetType()}");
+            }
+
+            _miniGameRunningBehaviour?.SetMessage(message);
         }
 
         private void OnEntryPointLoadingProgressChanged(float progress)
@@ -345,7 +358,7 @@ namespace com.appidea.MiniGamePlatform.Core
         private async Task<IMiniGameEntryPoint> CreateEntryPoint(IResourceLocator catalog, Scene scene)
         {
             if (catalog.Locate(MiniGamePlatformConstants.EntryPointAddress, typeof(GameObject), out var d) == false)
-                throw new Exception($"Entry point not found in the catalog `{catalog.LocatorId}`");
+                throw new Exception($"The entry point not found in the catalog `{catalog.LocatorId}`");
 
             var prefab = await Addressables.LoadAssetAsync<GameObject>(d.First()).Task;
             var entryPointGameObject = UnityEngine.Object.Instantiate(prefab);
@@ -353,7 +366,7 @@ namespace com.appidea.MiniGamePlatform.Core
             var entryPoint = entryPointGameObject.GetComponent<IMiniGameEntryPoint>();
 
             if (entryPoint == null)
-                throw new Exception($"Entry point not found in the game object `{entryPointGameObject}`");
+                throw new Exception($"The entry point not found in the game object `{entryPointGameObject}`");
 
             return entryPoint;
         }

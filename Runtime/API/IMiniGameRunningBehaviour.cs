@@ -9,9 +9,11 @@ namespace com.appidea.MiniGamePlatform.Core
     {
         event Action<MiniGameState> StateChanged;
         event Action<Exception> ExceptionHappened;
+        event Action<IMessage> MessageReceived;
         MiniGameState State { get; }
         string Name { get; }
         Exception LastException { get; }
+        IMessage LastMessage { get; }
         CancellationToken CancellationToken { get; }
         Task ActiveTask { get; }
         RunningMiniGameStateData StateData { get; }
