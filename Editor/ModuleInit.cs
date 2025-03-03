@@ -7,7 +7,13 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
     [InitializeOnLoad]
     public static class ModuleInit
     {
-        [MenuItem("MiniGame Platform/Mini games config")]
+        [MenuItem("Tools/Mini games platform/Clear builtin cache data")]
+        public static void CleanupCache()
+        {
+            DataLoaderWithCache.CleanupCache();
+        }
+
+        [MenuItem("Tools/Mini games platform/Mini games config")]
         public static void CreateOrSelectProjectConfig()
         {
             var data = AssetDatabase.FindAssets($"t:{nameof(MiniGamesPlatformConfig)}")
