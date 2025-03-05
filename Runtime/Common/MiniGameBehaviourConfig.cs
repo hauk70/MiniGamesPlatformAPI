@@ -9,9 +9,9 @@ namespace com.appidea.MiniGamePlatform.Core
     {
         public MiniGameConfig Config => config;
         [SerializeField] private MiniGameConfig config;
-        public MiniGameLoadType LoadType;
+        public CatalogLoadType LoadType;
 
-        public MiniGameBehaviourConfig(MiniGameConfig config, MiniGameLoadType loadType)
+        public MiniGameBehaviourConfig(MiniGameConfig config, CatalogLoadType loadType)
         {
             this.config = config;
             LoadType = loadType;

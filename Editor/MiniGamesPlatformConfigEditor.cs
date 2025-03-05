@@ -156,7 +156,7 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
             void AddConfigs(MiniGameConfig[] configs)
             {
                 var newBehaviourConfigs = configs
-                    .Select(c => new MiniGameBehaviourConfig(c, MiniGameLoadType.RemoteLoad))
+                    .Select(c => new MiniGameBehaviourConfig(c, CatalogLoadType.RemoteLoad))
                     .ToArray();
                 platformConfig.MiniGameConfigs.AddRange(newBehaviourConfigs);
                 PlatformLinksManager.AddNewConfigs(newBehaviourConfigs);

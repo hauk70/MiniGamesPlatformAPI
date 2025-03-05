@@ -6,7 +6,8 @@
         "Unity.Addressables",
         "com.appidea.MiniGamePlatform.CommunicationAPI.Editor",
         "Unity.Addressables.Editor",
-        "com.appidea.MiniGamePlatform.Core"
+        "com.appidea.MiniGamePlatform.Core",
+        "Unity.ScriptableBuildPipeline.Editor"
     ],
     "includePlatforms": [
         "Editor"
