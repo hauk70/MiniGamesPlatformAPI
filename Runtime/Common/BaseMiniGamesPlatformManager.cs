@@ -22,7 +22,18 @@ namespace com.appidea.MiniGamePlatform.Core
     public class BaseMiniGamesPlatformManager : IMiniGamesPlatformManager
     {
         public event Action ReadyToRun;
-        public bool IsReadyToRun { get; private set; }
+
+        public bool IsReadyToRun
+        {
+            get => _isReadyToRun;
+            protected set
+            {
+                _isReadyToRun = value;
+                if (_isReadyToRun) ReadyToRun?.Invoke();
+            }
+        }
+
+        private bool _isReadyToRun;
 
         public IReadOnlyList<string> MiniGameNames =>
             Config.MiniGameConfigs.Select(mg => mg.Config.MiniGameName).ToList();
@@ -47,6 +58,8 @@ namespace com.appidea.MiniGamePlatform.Core
             AnalyticsLogger = new MiniGameAnalyticsLogger(analyticsLogger, DecorateAnalyticsKey);
             Logger = logger;
             MiniGameLogger = new MiniGameLogger(logger, DecorateLogger);
+
+            IsReadyToRun = true;
         }
 
         public async Task<bool> IsMiniGameCacheReady(MiniGameBehaviourConfig miniGameConfig)
@@ -181,7 +194,6 @@ namespace com.appidea.MiniGamePlatform.Core
                 taskSource.TrySetResult(null);
 
                 IsReadyToRun = true;
-                ReadyToRun?.Invoke();
             }
         }
 
