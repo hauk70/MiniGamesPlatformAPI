@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,6 +8,9 @@ namespace com.appidea.MiniGamePlatform.Core
 {
     public interface IMiniGamesPlatformManager
     {
+        event Action ReadyToRun;
+        bool IsReadyToRun { get; }
+        
         IReadOnlyList<string> MiniGameNames { get; }
         IMiniGameRunningBehaviour MiniGameRunningBehaviour { get; }
 

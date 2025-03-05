@@ -21,6 +21,9 @@ namespace com.appidea.MiniGamePlatform.Core
 
     public class BaseMiniGamesPlatformManager : IMiniGamesPlatformManager
     {
+        public event Action ReadyToRun;
+        public bool IsReadyToRun { get; private set; }
+
         public IReadOnlyList<string> MiniGameNames =>
             Config.MiniGameConfigs.Select(mg => mg.Config.MiniGameName).ToList();
 
@@ -100,6 +103,9 @@ namespace com.appidea.MiniGamePlatform.Core
             if (MiniGameRunningBehaviour != null)
                 throw new InvalidOperationException("Another mini-game is already running.");
 
+            if (IsReadyToRun == false)
+                throw new InvalidOperationException("The platform is not ready to run for some reasons.");
+
             EnsureMiniGameNameIsValid(miniGameName);
             var miniGameConfig = Config.MiniGameConfigs.First(c => c.Config.MiniGameName == miniGameName);
 
@@ -127,6 +133,8 @@ namespace com.appidea.MiniGamePlatform.Core
         {
             try
             {
+                IsReadyToRun = false;
+
                 _miniGameRunningBehaviour.SetState(MiniGameState.ResourcesLoading);
                 if (await IsMiniGameCacheReady(miniGameConfig) == false)
                 {
@@ -171,6 +179,9 @@ namespace com.appidea.MiniGamePlatform.Core
             {
                 await CleanupMiniGame();
                 taskSource.TrySetResult(null);
+
+                IsReadyToRun = true;
+                ReadyToRun?.Invoke();
             }
         }
 
