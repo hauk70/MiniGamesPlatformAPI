@@ -2,11 +2,13 @@
     "name": "com.appidea.MiniGamePlatform.Core.Editor",
     "rootNamespace": "com.appidea.MiniGamePlatform.Core.Editor",
     "references": [
-        "com.appidea.MiniGamePlatform.CommunicationAPI",
         "Unity.Addressables",
-        "com.appidea.MiniGamePlatform.CommunicationAPI.Editor",
         "Unity.Addressables.Editor",
-        "com.appidea.MiniGamePlatform.Core"
+        "Unity.ResourceManager",
+        "com.appidea.MiniGamePlatform.CommunicationAPI",
+        "com.appidea.MiniGamePlatform.CommunicationAPI.Editor",
+        "com.appidea.MiniGamePlatform.Core",
+        "Unity.ScriptableBuildPipeline.Editor"
     ],
     "includePlatforms": [
         "Editor"

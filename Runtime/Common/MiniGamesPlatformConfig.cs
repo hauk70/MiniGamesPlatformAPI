@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace com.appidea.MiniGamePlatform.Core
 {
-    [CreateAssetMenu(menuName = "Mini game platform/Core platform config", fileName = "MiniGamesPlatformConfig", order = 0)]
+    [CreateAssetMenu(menuName = "Mini games platform/Core platform config", fileName = "MiniGamesPlatformConfig", order = 0)]
     public class MiniGamesPlatformConfig : ScriptableObject
     {
         [SerializeField]

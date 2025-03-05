@@ -17,6 +17,7 @@ namespace com.appidea.MiniGamePlatform.Core
         public RunningMiniGameStateData StateData { get; private set; }
         public CancellationToken CancellationToken { get; }
         public Task ActiveTask { get; private set; }
+        public readonly CompositeHandle Handle;
         public IMiniGameLoadingProgressHandler LoadingProgressHandler => LoadingProgressHandlerImpl;
         public IMiniGameLoadingProgressHandler UnloadingProgressHandler => UnloadingProgressHandlerImpl;
         public readonly TaskCompletionSource<object> TaskCompletionSource;
@@ -24,7 +25,9 @@ namespace com.appidea.MiniGamePlatform.Core
         public readonly MiniGameLoadingProgressHandler LoadingProgressHandlerImpl;
         public readonly MiniGameLoadingProgressHandler UnloadingProgressHandlerImpl;
 
-        public MiniGameRunningBehaviour(string name, CancellationToken cancellationToken,
+        public MiniGameRunningBehaviour(string name,
+            CompositeHandle handle,
+            CancellationToken cancellationToken,
             TaskCompletionSource<object> taskCompletionSource,
             MiniGameLoadingProgressHandler loadingProgressHandler,
             MiniGameLoadingProgressHandler unloadingProgressHandler)
@@ -34,6 +37,7 @@ namespace com.appidea.MiniGamePlatform.Core
             TaskCompletionSource = taskCompletionSource;
             LoadingProgressHandlerImpl = loadingProgressHandler;
             UnloadingProgressHandlerImpl = unloadingProgressHandler;
+            Handle = handle;
         }
 
         public void SetTask(Task task)

@@ -29,9 +29,6 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
                 TryFindNotConnectedMiniGames(platformConfig);
 
             RenderNewConfigsList(_newConfigs, platformConfig);
-
-            if (GUILayout.Button("Rebuild link.xml"))
-                PlatformLinksManager.RebuildConfigs(platformConfig.MiniGameConfigs.ToArray());
         }
 
         private void OnDisable()
@@ -66,16 +63,22 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
                     EditorGUILayout.BeginVertical("box");
                     using (new EditorGUI.DisabledGroupScope(true))
                     {
-                        EditorGUILayout.ObjectField("Config", behaviourConfig.Config, typeof(MiniGameConfig),
-                            false);
+                        EditorGUILayout.ObjectField(nameof(behaviourConfig.Config), behaviourConfig.Config,
+                            typeof(MiniGameConfig), false);
 
                         EditorGUI.indentLevel++;
-                        EditorGUILayout.TextField("Version", behaviourConfig.Config.Version);
-                        EditorGUILayout.TextField("URL", behaviourConfig.Config.Url);
+                        EditorGUILayout.TextField(nameof(behaviourConfig.Config.Version),
+                            behaviourConfig.Config.Version);
+                        EditorGUILayout.TextField(nameof(behaviourConfig.Config.Url), behaviourConfig.Config.Url);
                         EditorGUI.indentLevel--;
-
-                        EditorGUILayout.EnumPopup("LoadType", behaviourConfig.LoadType);
                     }
+
+                    var loadType = (CatalogLoadType)EditorGUILayout.EnumPopup(nameof(behaviourConfig.LoadType),
+                        behaviourConfig.LoadType);
+                    if (loadType != behaviourConfig.LoadType)
+                        HandleLoadingTypeChange(behaviourConfig, behaviourConfig.LoadType, loadType);
+
+                    behaviourConfig.LoadType = loadType;
 
                     if (GUILayout.Button("Remove"))
                     {
@@ -93,7 +96,7 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
                 EditorUtility.SetDirty(platformConfig);
         }
 
-        public void RenderNewConfigsList(List<MiniGameConfig> newConfigs, MiniGamesPlatformConfig platformConfig)
+        private void RenderNewConfigsList(List<MiniGameConfig> newConfigs, MiniGamesPlatformConfig platformConfig)
         {
             if (newConfigs == null || newConfigs.Count == 0)
             {
@@ -118,7 +121,8 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
                 GUILayout.Space(15);
                 if (_isNewItemExpanded.ContainsKey(current) == false)
                     _isNewItemExpanded.Add(current, false);
-                _isNewItemExpanded[current] = EditorGUILayout.Foldout(_isNewItemExpanded[current], current.MiniGameName, true);
+                _isNewItemExpanded[current] =
+                    EditorGUILayout.Foldout(_isNewItemExpanded[current], current.MiniGameName, true);
                 EditorGUILayout.EndHorizontal();
 
                 if (_isNewItemExpanded[current] == false)
@@ -156,15 +160,34 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
             void AddConfigs(MiniGameConfig[] configs)
             {
                 var newBehaviourConfigs = configs
-                    .Select(c => new MiniGameBehaviourConfig(c, MiniGameLoadType.RemoteLoad))
+                    .Select(c => new MiniGameBehaviourConfig(c, CatalogLoadType.RemoteLoad))
                     .ToArray();
                 platformConfig.MiniGameConfigs.AddRange(newBehaviourConfigs);
-                PlatformLinksManager.AddNewConfigs(newBehaviourConfigs);
 
                 EditorUtility.SetDirty(platformConfig);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
             }
+        }
+
+        private async void HandleLoadingTypeChange(MiniGameBehaviourConfig current, CatalogLoadType prevLoadType,
+            CatalogLoadType newLoadType)
+        {
+            if (newLoadType != CatalogLoadType.BuiltIn)
+                return;
+
+            var urls = new List<string>
+            {
+                current.Config.GetFullUrl(
+                    MiniGamePlatformUtils.GetPlatformTargetByBuildTarget(EditorUserBuildSettings.activeBuildTarget))
+            };
+
+            foreach (var sharedCatalogRef in current.Config.SharedCatalogs)
+                urls.Add(sharedCatalogRef.GetFullUrl(
+                    MiniGamePlatformUtils.GetPlatformTargetByBuildTarget(EditorUserBuildSettings.activeBuildTarget)));
+
+            foreach (var url in urls)
+                await BuiltInBundlesUtils.EnsureCatalogDownloaded(url);
         }
 
         private void TryFindNotConnectedMiniGames(MiniGamesPlatformConfig coreConfig)
@@ -179,6 +202,7 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
                 .Select(c => c.Config);
 
             _newConfigs.AddRange(allConfigs.Where(c => presentConfigs.Contains(c) == false));
+            _newConfigs.AddRange(allConfigs.Where(c => presentConfigs.Contains(c) == false));
             _isNewConfigsListExpanded = true;
         }
 
@@ -186,7 +210,6 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
         {
             var config = platformConfig.MiniGameConfigs[i];
             platformConfig.MiniGameConfigs.RemoveAt(i);
-            PlatformLinksManager.RemoveConfig(new[] { config });
         }
     }
 }
