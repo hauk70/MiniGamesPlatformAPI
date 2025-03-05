@@ -20,6 +20,20 @@ namespace com.appidea.MiniGamePlatform.Core
 
     public class BaseMiniGamesPlatformManager : IMiniGamesPlatformManager
     {
+        public event Action ReadyToRun;
+
+        public bool IsReadyToRun
+        {
+            get => _isReadyToRun;
+            protected set
+            {
+                _isReadyToRun = value;
+                if (_isReadyToRun) ReadyToRun?.Invoke();
+            }
+        }
+
+        private bool _isReadyToRun;
+
         public IReadOnlyList<string> MiniGameNames =>
             Config.MiniGameConfigs.Select(mg => mg.Config.MiniGameName).ToList();
 
@@ -43,6 +57,8 @@ namespace com.appidea.MiniGamePlatform.Core
             AnalyticsLogger = new MiniGameAnalyticsLogger(analyticsLogger, DecorateAnalyticsKey);
             Logger = logger;
             MiniGameLogger = new MiniGameLogger(logger, DecorateLogger);
+
+            IsReadyToRun = true;
         }
 
         public async Task<CompositeHandle<bool>> IsMiniGameCacheReady(MiniGameBehaviourConfig miniGameConfig)
@@ -128,6 +144,9 @@ namespace com.appidea.MiniGamePlatform.Core
             if (MiniGameRunningBehaviour != null)
                 throw new InvalidOperationException("Another mini-game is already running.");
 
+            if (IsReadyToRun == false)
+                throw new InvalidOperationException("The platform is not ready to run for some reasons.");
+
             EnsureMiniGameNameIsValid(miniGameName);
             var miniGameConfig = Config.MiniGameConfigs.First(c => c.Config.MiniGameName == miniGameName);
 
@@ -158,6 +177,8 @@ namespace com.appidea.MiniGamePlatform.Core
         {
             try
             {
+                IsReadyToRun = false;
+
                 _miniGameRunningBehaviour.SetState(MiniGameState.ResourcesLoading);
                 var downloadHandle = await DownloadGame(miniGameConfig);
                 compositeHandle.Add(downloadHandle);
@@ -206,6 +227,8 @@ namespace com.appidea.MiniGamePlatform.Core
             {
                 await CleanupMiniGame();
                 taskSource.TrySetResult(null);
+
+                IsReadyToRun = true;
             }
         }
 
