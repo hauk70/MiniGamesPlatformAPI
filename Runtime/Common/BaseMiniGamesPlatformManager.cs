@@ -61,12 +61,15 @@ namespace com.appidea.MiniGamePlatform.Core
             IsReadyToRun = true;
         }
 
-        public async Task<CompositeHandle<bool>> IsMiniGameCacheReady(MiniGameBehaviourConfig miniGameConfig)
+        public async Task<bool> IsMiniGameCacheReady(MiniGameBehaviourConfig miniGameConfig)
         {
             var catalogHandle = await LoadCatalog(miniGameConfig);
-            var compositeHandle = new CompositeHandle<bool>(catalogHandle);
+            var compositeHandle = new CompositeHandle(catalogHandle);
             if (catalogHandle.Status == AsyncOperationStatus.Failed)
-                return compositeHandle;
+            {
+                compositeHandle.Dispose();
+                return false;
+            }
 
             var result = true;
 
@@ -86,9 +89,8 @@ namespace com.appidea.MiniGamePlatform.Core
                     result = false;
             }));
 
-            compositeHandle.Value = result;
-
-            return compositeHandle;
+            compositeHandle.Dispose();
+            return result;
         }
 
         public async Task<CompositeHandle<bool>> DownloadGame(MiniGameBehaviourConfig miniGameConfig)
@@ -442,129 +444,6 @@ namespace com.appidea.MiniGamePlatform.Core
                 throw new Exception($"The entry point not found in the game object `{entryPointGameObject}`");
 
             return entryPoint;
-        }
-    }
-
-    public class CompositeHandle
-    {
-        protected bool IsDisposed;
-        private readonly List<object> _handles = new();
-
-        public CompositeHandle() : this(Array.Empty<AsyncOperationHandle>())
-        {
-        }
-
-        public CompositeHandle(AsyncOperationHandle handle) : this(new[] { handle })
-        {
-        }
-
-        public CompositeHandle(params AsyncOperationHandle[] handles)
-        {
-            Add(handles);
-        }
-
-        public void Add(params AsyncOperationHandle[] handles)
-        {
-            if (IsDisposed)
-                throw new ObjectDisposedException(nameof(CompositeHandle));
-
-            if (handles == null)
-                throw new ArgumentNullException(nameof(handles));
-
-            foreach (var handle in handles)
-                if (handle.IsValid())
-                    _handles.Add(handle);
-        }
-
-        public void Add<T>(params AsyncOperationHandle<T>[] handles)
-        {
-            if (IsDisposed)
-                throw new ObjectDisposedException(nameof(CompositeHandle));
-
-
-            if (handles == null)
-                throw new ArgumentNullException(nameof(handles));
-
-            foreach (var handle in handles)
-                if (handle.IsValid())
-                    _handles.Add(handle);
-        }
-
-        public void Add(params CompositeHandle[] compositeHandles)
-        {
-            if (IsDisposed)
-                throw new ObjectDisposedException(nameof(CompositeHandle));
-
-            if (compositeHandles == null)
-                throw new ArgumentNullException(nameof(compositeHandles));
-
-            foreach (var compositeHandle in compositeHandles)
-                _handles.Add(compositeHandle);
-        }
-
-        public void Dispose()
-        {
-            if (IsDisposed)
-                return;
-            IsDisposed = true;
-
-            for (int i = _handles.Count - 1; i >= 0; i--)
-            {
-                switch (_handles[i])
-                {
-                    case AsyncOperationHandle handle when handle.IsValid():
-                        Addressables.Release(handle);
-                        break;
-                    case AsyncOperationHandle<object> genericHandle when genericHandle.IsValid():
-                        Addressables.Release(genericHandle);
-                        break;
-                    case CompositeHandle composite:
-                        composite.Dispose();
-                        break;
-                }
-            }
-
-            _handles.Clear();
-        }
-    }
-
-    public class CompositeHandle<T> : CompositeHandle
-    {
-        public T Value { get; set; }
-
-        public CompositeHandle() : this(default, Array.Empty<AsyncOperationHandle>())
-        {
-        }
-
-        public CompositeHandle(params AsyncOperationHandle[] handles) : this(default, handles)
-        {
-        }
-
-        public CompositeHandle(AsyncOperationHandle handle) : this(default, new[] { handle })
-        {
-        }
-
-        public CompositeHandle(T value) : this(value, Array.Empty<AsyncOperationHandle>())
-        {
-        }
-
-        public CompositeHandle(T value, params AsyncOperationHandle[] handles) : base(handles)
-        {
-            Value = value;
-        }
-
-        public void SetValue(T value)
-        {
-            if (IsDisposed)
-                throw new ObjectDisposedException(nameof(CompositeHandle<T>));
-
-            Value = value;
-        }
-
-        public new void Dispose()
-        {
-            Value = default;
-            base.Dispose();
         }
     }
 }

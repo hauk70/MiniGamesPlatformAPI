@@ -41,7 +41,6 @@ namespace com.appidea.MiniGamePlatform.Core
             return guid;
         }
 
-        // я возвращаю хендл на старый каталог локатор, но сам его оверрайжу и забываю
         public static async Task<AsyncOperationHandle<IResourceLocator>> LoadLocalCatalogAndReplaceLocator(string catalogUrl)
         {
             var localCatalogPath = GetCatalogFilePath(catalogUrl);
@@ -71,9 +70,10 @@ namespace com.appidea.MiniGamePlatform.Core
             var localLocator = new BuiltInBundlesLocator(originalLocator, catalogUrl);
 
             Addressables.RemoveResourceLocator(originalLocator);
+            Addressables.Release(handle);
             Addressables.AddResourceLocator(localLocator);
 
-            return handle;
+            return Addressables.ResourceManager.CreateCompletedOperation<IResourceLocator>(localLocator, null);
         }
     }
 }

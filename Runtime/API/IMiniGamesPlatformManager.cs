@@ -14,8 +14,8 @@ namespace com.appidea.MiniGamePlatform.Core
         IReadOnlyList<string> MiniGameNames { get; }
         IMiniGameRunningBehaviour MiniGameRunningBehaviour { get; }
 
-        // Task<bool> IsMiniGameCacheReady(MiniGameBehaviourConfig miniGameBehaviourConfig);
-        // Task<bool> PreloadGame(MiniGameBehaviourConfig miniGameBehaviourConfig);
+        Task<bool> IsMiniGameCacheReady(MiniGameBehaviourConfig miniGameBehaviourConfig);
+        Task<CompositeHandle<bool>> DownloadGame(MiniGameBehaviourConfig miniGameConfig);
 
         IMiniGameRunningBehaviour LoadAndRunMiniGame(string miniGameName, CancellationToken cancellationToken,
             GameOverScreenData gameOverScreenData = null);

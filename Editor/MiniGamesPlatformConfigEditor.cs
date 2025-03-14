@@ -202,7 +202,6 @@ namespace com.appidea.MiniGamePlatform.Core.Editor
                 .Select(c => c.Config);
 
             _newConfigs.AddRange(allConfigs.Where(c => presentConfigs.Contains(c) == false));
-            _newConfigs.AddRange(allConfigs.Where(c => presentConfigs.Contains(c) == false));
             _isNewConfigsListExpanded = true;
         }
 
